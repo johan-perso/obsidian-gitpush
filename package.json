@@ -2,12 +2,12 @@
 	"private": true,
 	"name": "obsidian-gitpush",
 	"version": "1.0.0",
-	"description": "Pull and Push files from specified folders to specified GitHub repositories",
+	"description": "Pull and Push files from specified folders in Obsidian to specified GitHub repositories",
 	"main": "src/index.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "node esbuild.config.mjs production",
-		"test": "node esbuild.config.mjs production && rsync -av --exclude='node_modules' --exclude='.git' ./ ~/Library/Mobile\\ Documents/iCloud~md~obsidian/Documents/Perso/.obsidian/plugins/obsidian-gitpush/ && echo 'Plugin copied to Obsidian vault'"
+		"test": "node -e \"const u=require('os').userInfo().username;if(u!=='johan'){console.error('Error: You should update your Obsidian vault path in package.json, and update username to match', u);process.exit(1)}\" && node esbuild.config.mjs production && rsync -av --exclude='node_modules' --exclude='.git' ./ ~/Library/Mobile\\ Documents/iCloud~md~obsidian/Documents/Perso/.obsidian/plugins/obsidian-gitpush/ && echo 'Plugin copied to Obsidian vault'"
 	},
 	"keywords": [],
 	"author": "JohanStickman",
