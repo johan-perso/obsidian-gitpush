@@ -7,6 +7,8 @@ You can configure multiple repositories for different folders, and specify the b
 
 *Vibe-coded in 4 hours, I didn't really check the code manually. If it works, that's good, otherwise, too bad - I didn't want to bother myself, I don't have much time and I have a more important project in progress.*
 
+<img width="1262" height="830" alt="image" src="https://github.com/user-attachments/assets/ff356f00-cb85-4099-8af0-d89e08b82f21" />
+
 
 ## Installation
 
