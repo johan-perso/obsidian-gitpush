@@ -1,0 +1,31 @@
+.gitpush-side-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.gitpush-side-panel label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.gitpush-side-panel input[type="text"] {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.gitpush-side-panel button {
+    cursor: pointer;
+}
+
+.gitpush-repo-info {
+    background-color: var(--background-secondary);
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.gitpush-repo-info h4 {
+    color: var(--text-accent);
+}

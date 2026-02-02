@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-gitpush",
+	"name": "GitPush",
+	"version": "1.0.0",
+	"minAppVersion": "1.11.5",
+	"description": "Pull and Push files from specified folders to specified GitHub repositories.",
+	"author": "Johan Stickman",
+	"authorUrl": "https://johanstick.fr",
+	"fundingUrl": "https://johanstick.fr/donate",
+	"isDesktopOnly": true
+}

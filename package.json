@@ -1,0 +1,25 @@
+{
+	"private": true,
+	"name": "obsidian-gitpush",
+	"version": "1.0.0",
+	"description": "Pull and Push files from specified folders to specified GitHub repositories",
+	"main": "src/index.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "node esbuild.config.mjs production",
+		"test": "node esbuild.config.mjs production && rsync -av --exclude='node_modules' --exclude='.git' ./ ~/Library/Mobile\\ Documents/iCloud~md~obsidian/Documents/Perso/.obsidian/plugins/obsidian-gitpush/ && echo 'Plugin copied to Obsidian vault'"
+	},
+	"keywords": [],
+	"author": "JohanStickman",
+	"license": "MIT",
+	"devDependencies": {
+		"builtin-modules": "3.3.0",
+		"esbuild": "0.17.3",
+		"eslint": "9.20.1",
+		"obsidian": "latest"
+	},
+	"dependencies": {
+		"@octokit/rest": "^22.0.1",
+		"ignore": "^7.0.5"
+	}
+}
