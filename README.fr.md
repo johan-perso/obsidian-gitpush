@@ -7,6 +7,8 @@ Vous pouvez configurer plusieurs dépôts pour différents dossiers, et spécifi
 
 *Vibe-codé en 4h, j'ai pas trop relu le code, si ça marche, c'est bien, sinon tant pis - j'voulais pas me prendre la tête, j'ai pas trop le temps et j'ai un projet plus important en cours.*
 
+<img width="1262" height="830" alt="image" src="https://github.com/user-attachments/assets/ff356f00-cb85-4099-8af0-d89e08b82f21" />
+
 ## Installation
 
 1. Téléchargez le fichier ZIP de l'extension depuis la [page des releases](https://github.com/johan-perso/obsidian-gitpush/releases/latest).
