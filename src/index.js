@@ -739,10 +739,6 @@ export default class GitPushPlugin extends Plugin {
 		})
 
 		this.addSettingTab(new GitPushSettingTab(this.app, this))
-
-		this.app.workspace.onLayoutReady(() => {
-			this.activateView()
-		})
 	}
 
 	async activateView() {
