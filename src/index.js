@@ -484,32 +484,64 @@ class GitPushView extends ItemView {
 
 	async pushImagesInMarkdown(file, octokit, owner, repo, branch, lastSynced) {
 		const text = await this.app.vault.read(file)
+		const imagesToProcess = new Set()
+
+		// 1. Scan Frontmatter
+		const cache = this.app.metadataCache.getFileCache(file)
+		if (cache && cache.frontmatter) {
+			const processValue = (val) => {
+				if (typeof val === "string") {
+					// Clean value: remove [[ ]], aliases |, anchors #
+					let cleanName = val.replace(/^\[\[/, "").replace(/\]\]$/, "")
+					cleanName = cleanName.split("|")[0].split("#")[0]
+					
+					const imageFile = this.app.metadataCache.getFirstLinkpathDest(cleanName, file.path)
+					if (imageFile && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(imageFile.extension.toLowerCase())) {
+						imagesToProcess.add(imageFile)
+					}
+				} else if (Array.isArray(val)) {
+					val.forEach(processValue)
+				}
+			}
+
+			Object.keys(cache.frontmatter).forEach(key => {
+				if (key === "position") return
+				processValue(cache.frontmatter[key])
+			})
+		}
+
+		// 2. Scan Body (Regex)
 		const imageRegex = /!\[\[(.*?)\]\]|!\[.*?\]\((.*?)\)/g
 		let match
 		while ((match = imageRegex.exec(text)) !== null) {
 			const imageName = (match[1] || match[2]).split("|")[0].split("#")[0]
 			const imageFile = this.app.metadataCache.getFirstLinkpathDest(imageName, file.path)
 			if (imageFile && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(imageFile.extension.toLowerCase())) {
-				const imgContent = await this.app.vault.readBinary(imageFile)
-				const imgPathInRepo = normalizePath(`${this.repoConfig.imagesPath || "images"}/${imageFile.name}`).replace(/^\//, "")
+				imagesToProcess.add(imageFile)
+			}
+		}
 
-				let imgSha
-				if (this.remoteTree) imgSha = this.remoteTree.get(imgPathInRepo)
-				const localImgSha = getGitBlobSha(imgContent)
+		// 3. Upload Images
+		for (const imageFile of imagesToProcess) {
+			const imgContent = await this.app.vault.readBinary(imageFile)
+			const imgPathInRepo = normalizePath(`${this.repoConfig.imagesPath || "images"}/${imageFile.name}`).replace(/^\//, "")
 
-				if (imgSha !== localImgSha) {
-					await octokit.repos.createOrUpdateFileContents({
-						owner,
-						repo,
-						path: imgPathInRepo,
-						message: `Upload image ${imageFile.name}`,
-						content: Buffer.from(imgContent).toString("base64"),
-						branch,
-						sha: imgSha
-					})
-					if (this.remoteTree) this.remoteTree.set(imgPathInRepo, localImgSha)
-					lastSynced[imgPathInRepo] = localImgSha
-				}
+			let imgSha
+			if (this.remoteTree) imgSha = this.remoteTree.get(imgPathInRepo)
+			const localImgSha = getGitBlobSha(imgContent)
+
+			if (imgSha !== localImgSha) {
+				await octokit.repos.createOrUpdateFileContents({
+					owner,
+					repo,
+					path: imgPathInRepo,
+					message: `Upload image ${imageFile.name}`,
+					content: Buffer.from(imgContent).toString("base64"),
+					branch,
+					sha: imgSha
+				})
+				if (this.remoteTree) this.remoteTree.set(imgPathInRepo, localImgSha)
+				lastSynced[imgPathInRepo] = localImgSha
 			}
 		}
 	}
