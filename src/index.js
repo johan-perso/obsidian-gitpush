@@ -15,6 +15,7 @@ import ignore from "ignore"
 import * as crypto from "crypto"
 
 const VIEW_TYPE_GITPUSH = "gitpush-view"
+const SUPPORTED_ATTACHED_MEDIAS = ["png", "jpg", "jpeg", "gif", "svg", "webp", "mp4", "webm"]
 
 const DEFAULT_SETTINGS = {
 	githubToken: "",
@@ -562,7 +563,7 @@ class GitPushView extends ItemView {
 					cleanName = cleanName.split("|")[0].split("#")[0]
 
 					const imageFile = this.app.metadataCache.getFirstLinkpathDest(cleanName, file.path)
-					if (imageFile && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(imageFile.extension.toLowerCase())) {
+					if (imageFile && SUPPORTED_ATTACHED_MEDIAS.includes(imageFile.extension.toLowerCase())) {
 						imagesToProcess.add(imageFile)
 					}
 				} else if (Array.isArray(val)) {
@@ -582,7 +583,7 @@ class GitPushView extends ItemView {
 		while ((match = imageRegex.exec(text)) !== null) {
 			const imageName = (match[1] || match[2]).split("|")[0].split("#")[0]
 			const imageFile = this.app.metadataCache.getFirstLinkpathDest(imageName, file.path)
-			if (imageFile && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(imageFile.extension.toLowerCase())) {
+			if (imageFile && SUPPORTED_ATTACHED_MEDIAS.includes(imageFile.extension.toLowerCase())) {
 				imagesToProcess.add(imageFile)
 			}
 		}
