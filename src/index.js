@@ -436,41 +436,107 @@ class GitPushView extends ItemView {
 		new Notice(`Pushing ${this.filesToPush.length} changes...`)
 
 		try {
+			// -- Collect all tree entries and track state changes --
+			const treeEntries = []
+			const filesToTrack = []
+			const deletedPaths = []
+			const imageMap = new Map() // deduplicate images across markdown files
+
 			for (const item of this.filesToPush) {
 				if (item.status.startsWith("deleted")) {
-					await octokit.repos.deleteFile({
-						owner,
-						repo,
+					treeEntries.push({
 						path: item.pathInRepo,
-						message: `Delete ${item.pathInRepo}`,
-						sha: item.remoteSha,
-						branch
+						mode: "100644",
+						type: "blob",
+						sha: null // to delete a file via the Tree API, set sha to null
 					})
-					delete lastSynced[item.pathInRepo]
-					if (this.remoteTree) this.remoteTree.delete(item.pathInRepo)
+					deletedPaths.push(item.pathInRepo)
 					continue
 				}
 
 				const content = await this.app.vault.readBinary(item.file)
-				const currentRemoteSha = this.remoteTree ? this.remoteTree.get(item.pathInRepo) : undefined
 
-				await octokit.repos.createOrUpdateFileContents({
-					owner,
-					repo,
-					path: item.pathInRepo,
-					message: commitMessage,
+				// Create a blob for this file
+				const { data: blobData } = await octokit.git.createBlob({
+					owner, repo,
 					content: Buffer.from(content).toString("base64"),
-					branch,
-					sha: currentRemoteSha
+					encoding: "base64"
 				})
 
-				if (this.remoteTree) this.remoteTree.set(item.pathInRepo, item.sha)
-				lastSynced[item.pathInRepo] = item.sha
+				treeEntries.push({
+					path: item.pathInRepo,
+					mode: "100644",
+					type: "blob",
+					sha: blobData.sha
+				})
+				filesToTrack.push({ pathInRepo: item.pathInRepo, sha: item.sha })
 
+				// Collect images referenced in markdown files
 				if (item.file.extension === "md") {
-					await this.pushImagesInMarkdown(item.file, octokit, owner, repo, branch, lastSynced)
+					const images = await this.collectImagesFromMarkdown(item.file)
+					for (const img of images) {
+						if (!imageMap.has(img.pathInRepo)) {
+							imageMap.set(img.pathInRepo, img)
+						}
+					}
 				}
 			}
+
+			// Create blobs for collected images
+			for (const [imgPath, img] of imageMap) {
+				const { data: blobData } = await octokit.git.createBlob({
+					owner, repo,
+					content: Buffer.from(img.content).toString("base64"),
+					encoding: "base64"
+				})
+
+				treeEntries.push({
+					path: imgPath,
+					mode: "100644",
+					type: "blob",
+					sha: blobData.sha
+				})
+				filesToTrack.push({ pathInRepo: imgPath, sha: img.localSha })
+			}
+
+			// Get current commit SHA for the branch
+			const { data: refData } = await octokit.git.getRef({ owner, repo, ref: `heads/${branch}` })
+			const latestCommitSha = refData.object.sha
+
+			// Get the base tree SHA from the latest commit
+			const { data: commitData } = await octokit.git.getCommit({ owner, repo, commit_sha: latestCommitSha })
+			const baseTreeSha = commitData.tree.sha
+
+			// Create a new tree with all changes at once, then create a single commit pointing to that tree
+			const { data: newTree } = await octokit.git.createTree({
+				owner, repo,
+				base_tree: baseTreeSha,
+				tree: treeEntries
+			})
+			const { data: newCommit } = await octokit.git.createCommit({
+				owner, repo,
+				message: commitMessage,
+				tree: newTree.sha,
+				parents: [latestCommitSha]
+			})
+
+			// Update the branch reference to the new commit
+			await octokit.git.updateRef({
+				owner, repo,
+				ref: `heads/${branch}`,
+				sha: newCommit.sha
+			})
+
+			// Update local tracking state
+			for (const { pathInRepo, sha } of filesToTrack) {
+				lastSynced[pathInRepo] = sha
+				if (this.remoteTree) this.remoteTree.set(pathInRepo, sha)
+			}
+			for (const path of deletedPaths) {
+				delete lastSynced[path]
+				if (this.remoteTree) this.remoteTree.delete(path)
+			}
+
 			new Notice("Push successful!")
 			this.plugin.settings.lastBranch = branch
 			this.plugin.settings.lastSyncedState = lastSynced
@@ -482,7 +548,7 @@ class GitPushView extends ItemView {
 		}
 	}
 
-	async pushImagesInMarkdown(file, octokit, owner, repo, branch, lastSynced) {
+	async collectImagesFromMarkdown(file) {
 		const text = await this.app.vault.read(file)
 		const imagesToProcess = new Set()
 
@@ -494,7 +560,7 @@ class GitPushView extends ItemView {
 					// Clean value: remove [[ ]], aliases |, anchors #
 					let cleanName = val.replace(/^\[\[/, "").replace(/\]\]$/, "")
 					cleanName = cleanName.split("|")[0].split("#")[0]
-					
+
 					const imageFile = this.app.metadataCache.getFirstLinkpathDest(cleanName, file.path)
 					if (imageFile && ["png", "jpg", "jpeg", "gif", "svg", "webp"].includes(imageFile.extension.toLowerCase())) {
 						imagesToProcess.add(imageFile)
@@ -521,7 +587,8 @@ class GitPushView extends ItemView {
 			}
 		}
 
-		// 3. Upload Images
+		// 3. Collect images that need uploading (changed compared to remote)
+		const result = []
 		for (const imageFile of imagesToProcess) {
 			const imgContent = await this.app.vault.readBinary(imageFile)
 			const imgPathInRepo = normalizePath(`${this.repoConfig.imagesPath || "images"}/${imageFile.name}`).replace(/^\//, "")
@@ -531,19 +598,15 @@ class GitPushView extends ItemView {
 			const localImgSha = getGitBlobSha(imgContent)
 
 			if (imgSha !== localImgSha) {
-				await octokit.repos.createOrUpdateFileContents({
-					owner,
-					repo,
-					path: imgPathInRepo,
-					message: `Upload image ${imageFile.name}`,
-					content: Buffer.from(imgContent).toString("base64"),
-					branch,
-					sha: imgSha
+				result.push({
+					pathInRepo: imgPathInRepo,
+					content: imgContent,
+					localSha: localImgSha
 				})
-				if (this.remoteTree) this.remoteTree.set(imgPathInRepo, localImgSha)
-				lastSynced[imgPathInRepo] = localImgSha
 			}
 		}
+
+		return result
 	}
 
 	async onPull() {
